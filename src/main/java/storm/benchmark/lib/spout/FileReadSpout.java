@@ -37,6 +37,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import storm.benchmark.metrics.Latencies;
 import storm.benchmark.tools.HDFSFileReader;
+import storm.benchmark.util.BenchmarkUtils;
 
 public class FileReadSpout extends BaseRichSpout {
 
@@ -48,6 +49,17 @@ public class FileReadSpout extends BaseRichSpout {
     
     public static final boolean DEFAULT_ACK = false;
     public static final String FIELDS = "sentence";
+
+    private long averageDelayNano;
+    private String distribution;
+    private long nextTupleNano;
+
+    public static final String SPOUT_TARGET_THROUGHPUT = "component.spout_target_throughput";
+    public static final String SPOUT_RATE_DISTRIBUTION = "component.spout_rate_distribution";
+    public static final String SPOUT_NUM = "component.spout_num";
+    public static final int DEFAULT_TARGET_THROUGHPUT = 50000;
+    public static final String DEFAULT_RATE_DISTRIBUTION = "uniform";
+    public static final int DEFAULT_SPOUT_NUM = 4;
 
     public final boolean ackEnabled;
     public HDFSFileReader reader;
@@ -71,6 +83,13 @@ public class FileReadSpout extends BaseRichSpout {
         this.ackEnabled = ackEnabled;
         this.reader =
                 new HDFSFileReader("hdfs://nimbus1:9000" + file);
+
+	int throughput = conf.getInt(SPOUT_TARGET_THROUGHPUT, DEFAULT_TARGET_THROUGHPUT);
+	int spout_num = conf.getInt(SPOUT_NUM, DEFAULT_SPOUT_NUM);
+
+	this.averageDelayNano = (long) (1e9 * spout_num / throughput);
+	this.distribution = conf.get(SPOUT_RATE_DISTRIBUTION, DEFAULT_RATE_DISTRIBUTION);
+	this.nextTupleNano = 0;
     }
 
     public FileReadSpout(boolean ackEnabled, HDFSFileReader reader) {
@@ -88,6 +107,19 @@ public class FileReadSpout extends BaseRichSpout {
 
     @Override
     public void nextTuple() {
+        if (this.distribution.equals("uniform")) {
+            if (this.nextTupleNano - System.nanoTime() < 0) {
+                emit();
+                this.nextTupleNano = System.nanoTime() + this.averageDelayNano;
+            } else {
+                return;
+            }
+        } else {
+            throw new UnsupportedOperationException("Only uniform interarrival time is supported");
+        }
+    }
+
+    private void emit() {
         if (ackEnabled) {
             collector.emit(new Values(reader.nextLine(),System.currentTimeMillis()), count);
             count++;
