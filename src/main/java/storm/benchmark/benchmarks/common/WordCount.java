@@ -77,6 +77,7 @@ public abstract class WordCount extends StormBenchmark {
   public static class SplitSentence extends BaseBasicBolt {
 
     public static final String FIELDS = "word";
+    private long count = 0;
 
     @Override
     public void prepare(Map stormConf, TopologyContext context) {
@@ -86,6 +87,10 @@ public abstract class WordCount extends StormBenchmark {
     public void execute(Tuple input, BasicOutputCollector collector) {
       for (String word : WordSplit.splitSentence(input.getString(0))) {
         collector.emit(new Values(word,input.getValue(1)));
+      }
+      count++;
+      if (count % 1000 == 0) {
+	      System.out.println("Collected " + count + " tuples");
       }
     }
 
