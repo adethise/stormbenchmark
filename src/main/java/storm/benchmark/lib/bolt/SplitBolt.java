@@ -24,6 +24,7 @@ import org.apache.storm.tuple.Values;
 public class SplitBolt extends BaseBasicBolt{
     public String FIELD1 = "sentence";
     public String FIELD2 = "sentence";
+    private long count = 0;
     
     public SplitBolt(String field1, String field2){
         this.FIELD1 = field1;
@@ -40,6 +41,10 @@ public class SplitBolt extends BaseBasicBolt{
     public void execute(Tuple tuple, BasicOutputCollector boc) {
         String[] words = tuple.getString(0).split(",");
         boc.emit(new Values(words[0],words[1]));
+        count++;
+	if (count % 1000 == 0) {
+		System.out.println("Collected " + count + " tuples");
+	}
     }
 
 
